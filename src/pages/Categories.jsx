@@ -24,7 +24,7 @@ const Categories = () => {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/categories');
+      const res = await api.get('/categories/');
       setCategories(res.data);
     } catch (err) {
       console.error(err);

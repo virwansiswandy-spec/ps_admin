@@ -19,7 +19,7 @@ const Dashboard = () => {
     try {
       const [sumRes, ordersRes] = await Promise.all([
         api.get('/orders/dashboard-summary').catch(() => ({ data: {} })),
-        api.get('/orders').catch(() => ({ data: [] }))
+        api.get('/orders/').catch(() => ({ data: [] }))
       ]);
       const summaryData = sumRes.data || {};
       setSummary(summaryData);

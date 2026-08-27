@@ -50,7 +50,7 @@ const Bonuses = () => {
         api.get('/bonuses/recap', { params }).catch(() => ({ data: [] })),
         api.get('/bonuses/details', { params }).catch(() => ({ data: [] })),
         api.get('/bonuses/me', { params: { month: selectedMonth, year: selectedYear } }).catch(() => ({ data: null })),
-        api.get('/users').catch(() => ({ data: [] }))
+        api.get('/users/').catch(() => ({ data: [] }))
       ]);
 
       setRecap(recapRes.data || []);

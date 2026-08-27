@@ -66,10 +66,10 @@ const Purchases = () => {
     setLoading(true);
     try {
       const [purchasesRes, suppliersRes, itemsRes, categoriesRes] = await Promise.all([
-        api.get('/purchases').catch(() => ({ data: [] })),
-        api.get('/suppliers').catch(() => ({ data: [] })),
-        api.get('/items', { params: { is_active: true } }).catch(() => api.get('/items')).catch(() => ({ data: [] })),
-        api.get('/categories').catch(() => ({ data: [] }))
+        api.get('/purchases/').catch(() => ({ data: [] })),
+        api.get('/suppliers/').catch(() => ({ data: [] })),
+        api.get('/items/', { params: { is_active: true } }).catch(() => api.get('/items/')).catch(() => ({ data: [] })),
+        api.get('/categories/').catch(() => ({ data: [] }))
       ]);
 
       setPurchases(purchasesRes.data || []);

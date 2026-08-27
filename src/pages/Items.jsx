@@ -67,8 +67,8 @@ const Items = () => {
     setLoading(true);
     try {
       const [itemsRes, catRes, unitsRes] = await Promise.all([
-        api.get('/items', { params: { is_active: true } }).catch(() => api.get('/items?is_active=true')).catch(() => api.get('/items')),
-        api.get('/categories'),
+        api.get('/items/', { params: { is_active: true } }).catch(() => api.get('/items/?is_active=true')).catch(() => api.get('/items/')),
+        api.get('/categories/'),
         api.get('/items/units').catch(() => ({ data: [] }))
       ]);
       const rawItems = itemsRes.data || [];

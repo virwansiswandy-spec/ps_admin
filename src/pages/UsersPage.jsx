@@ -26,7 +26,7 @@ const UsersPage = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/users');
+      const res = await api.get('/users/');
       setUsers(res.data);
     } catch (err) {
       console.error(err);

@@ -160,8 +160,8 @@ const POS = () => {
     setLoading(true);
     try {
       const [itemsRes, catRes] = await Promise.all([
-        api.get('/items', { params: { is_active: true } }).catch(() => api.get('/items?is_active=true')).catch(() => api.get('/items')),
-        api.get('/categories')
+        api.get('/items/', { params: { is_active: true } }).catch(() => api.get('/items/?is_active=true')).catch(() => api.get('/items/')),
+        api.get('/categories/')
       ]);
       const rawItems = itemsRes.data || [];
       const activeOnly = rawItems.filter(item => {
@@ -323,7 +323,7 @@ const POS = () => {
     };
 
     try {
-      const res = await api.post('/orders', orderPayload);
+      const res = await api.post('/orders/', orderPayload);
       const createdOrder = res.data;
       setLastCompletedOrder(createdOrder);
       setShowCheckoutModal(false);
@@ -378,7 +378,7 @@ const POS = () => {
   const fetchShiftSummary = async () => {
     setLoadingShift(true);
     try {
-      const res = await api.get('/orders', { params: { limit: 100 } });
+      const res = await api.get('/orders/', { params: { limit: 100 } });
       const allOrders = res.data || [];
       const todayStr = new Date().toISOString().split('T')[0];
       const todaysOrders = allOrders.filter(o => {

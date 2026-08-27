@@ -229,9 +229,9 @@ const Portfolios = () => {
     setLoading(true);
     try {
       const [portRes, catRes, itemsRes] = await Promise.all([
-        api.get('/portfolios').catch(() => ({ data: [] })),
-        api.get('/categories').catch(() => ({ data: [] })),
-        api.get('/items').catch(() => ({ data: [] }))
+        api.get('/portfolios/').catch(() => ({ data: [] })),
+        api.get('/categories/').catch(() => ({ data: [] })),
+        api.get('/items/').catch(() => ({ data: [] }))
       ]);
 
       const rawPortfolios = portRes.data || [];

@@ -71,9 +71,9 @@ const Compositions = () => {
     setLoading(true);
     try {
       const [compRes, itemsRes, catRes] = await Promise.all([
-        api.get('/compositions').catch(() => ({ data: [] })),
-        api.get('/items', { params: { is_active: true } }).catch(() => api.get('/items?is_active=true')).catch(() => api.get('/items')).catch(() => ({ data: [] })),
-        api.get('/categories').catch(() => ({ data: [] }))
+        api.get('/compositions/').catch(() => ({ data: [] })),
+        api.get('/items/', { params: { is_active: true } }).catch(() => api.get('/items/?is_active=true')).catch(() => api.get('/items/')).catch(() => ({ data: [] })),
+        api.get('/categories/').catch(() => ({ data: [] }))
       ]);
       setCompositions(compRes.data || []);
       setItems(itemsRes.data || []);

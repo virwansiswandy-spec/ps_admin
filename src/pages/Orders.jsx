@@ -212,7 +212,7 @@ const Orders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/orders');
+      const res = await api.get('/orders/');
       setOrders(res.data);
     } catch (err) {
       console.error(err);
