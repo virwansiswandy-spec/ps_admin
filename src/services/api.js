@@ -31,6 +31,10 @@ export const SERVER_ORIGIN = (() => {
 
 export const getFileUrl = (url) => {
   if (!url) return '';
+  if (url.includes('127.0.0.1:8000') || url.includes('localhost:8000')) {
+    const relativePath = url.replace(/^https?:\/\/[^\/]+/, '');
+    return `${SERVER_ORIGIN}${relativePath}`;
+  }
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
