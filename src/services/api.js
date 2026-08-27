@@ -1,7 +1,16 @@
 import axios from 'axios';
 
-const rawEnvUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-export const API_BASE_URL = /^https?:\/\//i.test(rawEnvUrl) ? rawEnvUrl : `https://${rawEnvUrl}`;
+const rawEnvUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').trim();
+
+export const API_BASE_URL = (() => {
+  if (/^https?:\/\//i.test(rawEnvUrl)) {
+    return rawEnvUrl;
+  }
+  if (rawEnvUrl.includes('localhost') || rawEnvUrl.includes('127.0.0.1')) {
+    return `http://${rawEnvUrl}`;
+  }
+  return `https://${rawEnvUrl}`;
+})();
 
 export const SERVER_ORIGIN = (() => {
   try {
