@@ -105,8 +105,9 @@ const WhatsAppChat = () => {
       if (searchTerm) params.search = searchTerm;
       if (filterUnread) params.unread_only = true;
 
-      const res = await api.get('/wa/conversations/', { params });
-      setConversations(res.data || []);
+      const res = await api.get('/wa/conversations', { params });
+      const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+      setConversations(list);
     } catch (err) {
       console.error('Error fetching WA conversations:', err);
     } finally {
@@ -119,7 +120,8 @@ const WhatsAppChat = () => {
     setLoadingMsgs(true);
     try {
       const res = await api.get(`/wa/conversations/${conversationId}/messages`);
-      setMessages(res.data || []);
+      const msgList = Array.isArray(res.data) ? res.data : (res.data?.messages || []);
+      setMessages(msgList);
 
       setConversations(prev => (Array.isArray(prev) ? prev : []).map(c => c.id === conversationId ? { ...c, unread_count: 0 } : c));
     } catch (err) {
@@ -154,15 +156,14 @@ const WhatsAppChat = () => {
       if (activeConversationRef.current?.id) {
         api.get(`/wa/conversations/${activeConversationRef.current.id}/messages`)
           .then(res => {
-            if (res.data && Array.isArray(res.data)) {
-              setMessages(prev => {
-                const currentList = Array.isArray(prev) ? prev : [];
-                if (res.data.length !== currentList.length) {
-                  return res.data;
-                }
-                return currentList;
-              });
-            }
+            const fetched = Array.isArray(res.data) ? res.data : (res.data?.messages || []);
+            setMessages(prev => {
+              const currentList = Array.isArray(prev) ? prev : [];
+              if (fetched.length !== currentList.length) {
+                return fetched;
+              }
+              return currentList;
+            });
           })
           .catch(() => {});
       }
