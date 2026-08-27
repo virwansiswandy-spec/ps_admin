@@ -64,12 +64,21 @@ const api = axios.create({
   },
 });
 
-// Interceptor to inject JWT token automatically
+// Interceptor to inject JWT token automatically and ensure trailing slash on collection URLs
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Prevent 307 redirects on endpoints missing trailing slash (e.g. /orders -> /orders/)
+    if (config.url && typeof config.url === 'string') {
+      const parts = config.url.split('?');
+      let path = parts[0];
+      const query = parts[1] ? `?${parts[1]}` : '';
+      if (path && !path.endsWith('/') && !/\.[a-zA-Z0-9]+$/.test(path)) {
+        config.url = `${path}/${query}`;
+      }
     }
     return config;
   },
