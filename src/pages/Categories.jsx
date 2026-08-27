@@ -72,7 +72,7 @@ const Categories = () => {
         }
         await api.put(`/categories/${editingCategory.id}`, payload);
       } else {
-        await api.post('/categories', payload);
+        await api.post('/categories/', payload);
       }
       setShowModal(false);
       setName('');

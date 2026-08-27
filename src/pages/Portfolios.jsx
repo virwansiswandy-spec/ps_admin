@@ -378,7 +378,7 @@ const Portfolios = () => {
           .catch(() => api.patch(`/portfolios/${targetId}`, payload));
         showSuccess('Berhasil!', `Portofolio "${formData.title}" telah diperbarui.`);
       } else {
-        const res = await api.post('/portfolios', payload);
+        const res = await api.post('/portfolios/', payload);
         targetId = res.data?.id || res.data?.portfolio?.id || res.data?.data?.id;
         showSuccess('Berhasil!', `Portofolio baru "${formData.title}" telah disimpan.`);
       }

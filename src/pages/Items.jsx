@@ -275,7 +275,7 @@ const Items = () => {
         const res = await api.put(`/items/${editingItem.id}`, payload);
         savedItemId = res.data.id;
       } else {
-        const res = await api.post('/items', payload);
+        const res = await api.post('/items/', payload);
         savedItemId = res.data.id;
       }
 

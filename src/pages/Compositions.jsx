@@ -288,7 +288,7 @@ const Compositions = () => {
       // Create new composition rows for the parent item
       for (const comp of compList) {
         if (comp.child_item_id) {
-          await api.post('/compositions', {
+          await api.post('/compositions/', {
             parent_item_id: parseInt(selectedParentId),
             child_item_id: parseInt(comp.child_item_id),
             quantity: parseFloat(comp.quantity || 1),
@@ -342,7 +342,7 @@ const Compositions = () => {
         }))
       };
 
-      const res = await api.post('/items', payload);
+      const res = await api.post('/items/', payload);
       const createdItem = res.data;
 
       // Upload image files if selected

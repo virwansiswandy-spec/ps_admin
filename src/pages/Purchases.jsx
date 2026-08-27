@@ -205,7 +205,7 @@ const Purchases = () => {
     }
 
     try {
-      const res = await api.post('/suppliers', {
+      const res = await api.post('/suppliers/', {
         name: quickSupplierData.name.trim(),
         contact_name: quickSupplierData.contact_name.trim() || null,
         phone: quickSupplierData.phone.trim() || null,
@@ -258,7 +258,7 @@ const Purchases = () => {
         track_stock: Boolean(quickItemData.track_stock)
       };
 
-      const res = await api.post('/items', payload);
+      const res = await api.post('/items/', payload);
       const newItem = res.data;
 
       setItemsList(prev => [newItem, ...prev]);
@@ -316,7 +316,7 @@ const Purchases = () => {
         } : {})
       };
 
-      await api.post('/purchases', payload);
+      await api.post('/purchases/', payload);
       showSuccess("Berhasil!", "Catatan Pembelian & Stok In berhasil disimpan.");
       setShowCreateModal(false);
       fetchPurchasesData();
