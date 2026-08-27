@@ -117,6 +117,72 @@ export const canEditOrDelete = (item, user, isSuperAdmin = false) => {
 };
 
 /**
+ * Utility to check whether the logged in user can delete a specific order/nota.
+ * 
+ * Rules:
+ * 1. Super Admin: Can delete ANY order.
+ * 2. Regular Admin: Can delete ONLY orders created by themselves AND where payment_status != 'paid' and order_status != 'completed'.
+ */
+export const canDeleteOrder = (order, user, isSuperAdmin = false) => {
+  if (!order || !user) return false;
+  if (isSuperAdmin || user?.role === 'super_admin') return true;
+
+  if (user?.role === 'admin') {
+    // 1. Must NOT be paid or completed
+    if (order.payment_status === 'paid' || order.order_status === 'completed') {
+      return false;
+    }
+
+    // 2. Check if created by this admin
+    const currentUserId = user.id !== undefined && user.id !== null ? String(user.id) : null;
+    const creatorId = order.created_by_user_id ?? order.created_by_user?.id ?? order.created_by?.id;
+    
+    if (currentUserId && creatorId !== undefined && creatorId !== null) {
+      if (String(creatorId) === currentUserId) return true;
+    }
+
+    // Check creator name/email matching
+    const currentEmail = user.email ? String(user.email).toLowerCase().trim() : null;
+    const currentUsername = user.username ? String(user.username).toLowerCase().trim() : null;
+    const currentFullName = user.full_name ? String(user.full_name).toLowerCase().trim() : (user.name ? String(user.name).toLowerCase().trim() : null);
+
+    const extractCreatorString = (val) => {
+      if (!val) return null;
+      if (typeof val === 'string' && val.trim()) return val.toLowerCase().trim();
+      if (typeof val === 'object' && val !== null) {
+        if (val.id !== undefined && val.id !== null && currentUserId && String(val.id) === currentUserId) return 'MATCH';
+        if (val.email) return String(val.email).toLowerCase().trim();
+        if (val.username) return String(val.username).toLowerCase().trim();
+        if (val.full_name) return String(val.full_name).toLowerCase().trim();
+      }
+      return null;
+    };
+
+    const strings = [
+      extractCreatorString(order.created_by_user),
+      extractCreatorString(order.created_by),
+      extractCreatorString(order.creator),
+      extractCreatorString(order.kasir),
+      extractCreatorString(order.cashier)
+    ];
+
+    if (strings.includes('MATCH')) return true;
+
+    for (const str of strings) {
+      if (str) {
+        if (currentEmail && str === currentEmail) return true;
+        if (currentUsername && str === currentUsername) return true;
+        if (currentFullName && str === currentFullName) return true;
+      }
+    }
+
+    return false;
+  }
+
+  return false;
+};
+
+/**
  * Display a sweetalert error warning when permission is denied.
  */
 export const showPermissionDeniedAlert = (actionName = 'mengubah / menghapus') => {

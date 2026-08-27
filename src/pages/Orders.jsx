@@ -2,14 +2,14 @@ import { showSuccess, showError, showConfirm } from '../utils/swal';
 import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag, Search, Filter, Eye, Download, Printer, CheckCircle2,
-  Clock, AlertTriangle, FileText, ChevronRight, RefreshCw, X, Wallet, CreditCard, DollarSign, UserCheck, RotateCcw
+  Clock, AlertTriangle, FileText, ChevronRight, RefreshCw, X, Wallet, CreditCard, DollarSign, UserCheck, RotateCcw, Trash2
 } from 'lucide-react';
 import api, { API_BASE_URL } from '../services/api';
 import Pagination from '../components/Pagination';
 import { useSortableData, SortableHeader } from '../hooks/useSortableData';
 import { sendServerPrint } from '../services/printService';
 import { useAuth } from '../context/AuthContext';
-import { canEditOrDelete, showPermissionDeniedAlert } from '../utils/permissions';
+import { canEditOrDelete, canDeleteOrder, showPermissionDeniedAlert } from '../utils/permissions';
 
 const getOrderCreatorName = (o) => {
   if (!o) return '-';
@@ -202,6 +202,33 @@ const Orders = () => {
       }
     } catch (err) {
       showError('Gagal Pelunasan!', err.response?.data?.detail || 'Gagal memproses pelunasan sisa nota.');
+    }
+  };
+
+  const handleDeleteOrder = async (order) => {
+    if (!canDeleteOrder(order, user, isSuperAdmin)) {
+      showPermissionDeniedAlert('menghapus nota ini. Admin hanya dapat menghapus nota yang dibuat sendiri dan belum LUNAS / COMPLETED.');
+      return;
+    }
+
+    const confirmed = await showConfirm({
+      title: 'Hapus Nota / Transaksi?',
+      text: `Apakah Anda yakin ingin menghapus nota "${order.invoice_number}" secara permanen? Stok barang akan dikembalikan dan seluruh catatan pembayaran/bonus terkait akan dihapus.`,
+      confirmText: 'Ya, Hapus Nota',
+      cancelText: 'Batal',
+      icon: 'warning'
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/orders/${order.id}`);
+      showSuccess('Berhasil!', `Nota "${order.invoice_number}" telah berhasil dihapus.`);
+      if (selectedOrder && selectedOrder.id === order.id) {
+        setSelectedOrder(null);
+      }
+      fetchOrders();
+    } catch (err) {
+      showError('Gagal Menghapus!', err.response?.data?.detail || 'Gagal menghapus nota.');
     }
   };
 
@@ -537,19 +564,31 @@ const Orders = () => {
                             <span>Detail</span>
                           </button>
 
-                          {((col.id !== 'completed' && col.id !== 'cancelled') || isSuperAdmin || user?.role === 'super_admin') && (
-                            <select
-                              value={o.order_status}
-                              onChange={(e) => handleStatusChangeAttempt(o, e.target.value)}
-                              className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-500"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="processing">Processing</option>
-                              <option value="ready_for_pickup">Ready Pickup</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancel</option>
-                            </select>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {((col.id !== 'completed' && col.id !== 'cancelled') || isSuperAdmin || user?.role === 'super_admin') && (
+                              <select
+                                value={o.order_status}
+                                onChange={(e) => handleStatusChangeAttempt(o, e.target.value)}
+                                className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-500"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="ready_for_pickup">Ready Pickup</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancel</option>
+                              </select>
+                            )}
+
+                            {canDeleteOrder(o, user, isSuperAdmin) && (
+                              <button
+                                onClick={() => handleDeleteOrder(o)}
+                                className="p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors"
+                                title="Hapus Nota"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -615,13 +654,24 @@ const Orders = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleOpenDetail(o)}
-                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          <span>Detail</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleOpenDetail(o)}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>Detail</span>
+                          </button>
+                          {canDeleteOrder(o, user, isSuperAdmin) && (
+                            <button
+                              onClick={() => handleDeleteOrder(o)}
+                              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
+                              title="Hapus Nota"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -939,6 +989,16 @@ const Orders = () => {
                 <FileText className="h-3.5 w-3.5" />
                 <span>PDF Invoice</span>
               </a>
+              {canDeleteOrder(selectedOrder, user, isSuperAdmin) && (
+                <button
+                  onClick={() => handleDeleteOrder(selectedOrder)}
+                  className="py-2.5 px-3 bg-rose-500/20 border border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-slate-950 font-bold rounded-md text-xs flex items-center justify-center gap-1 transition-colors"
+                  title="Hapus Nota Transaksi"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Hapus Nota</span>
+                </button>
+              )}
               <button
                 onClick={() => setSelectedOrder(null)}
                 className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-md text-xs ml-auto"
