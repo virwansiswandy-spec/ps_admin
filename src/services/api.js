@@ -3,22 +3,23 @@ import axios from 'axios';
 const envApiUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.trim() : '';
 
 export const API_BASE_URL = (() => {
+  // In production build (npm run build), ignore any localhost/127.0.0.1 dev URLs
+  if (import.meta.env.PROD) {
+    if (envApiUrl && !envApiUrl.includes('localhost') && !envApiUrl.includes('127.0.0.1')) {
+      if (/^https?:\/\//i.test(envApiUrl)) return envApiUrl;
+      return envApiUrl.startsWith('/')
+        ? (typeof window !== 'undefined' ? `${window.location.origin}${envApiUrl}` : envApiUrl)
+        : `https://${envApiUrl}`;
+    }
+    return typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '/api/v1';
+  }
+
+  // In development mode (npm run dev)
   if (envApiUrl) {
-    if (/^https?:\/\//i.test(envApiUrl)) {
-      return envApiUrl;
-    }
-    if (envApiUrl.startsWith('/')) {
-      return typeof window !== 'undefined' ? `${window.location.origin}${envApiUrl}` : envApiUrl;
-    }
-    if (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1')) {
-      return `http://${envApiUrl}`;
-    }
-    return `https://${envApiUrl}`;
+    if (/^https?:\/\//i.test(envApiUrl)) return envApiUrl;
+    return `http://${envApiUrl}`;
   }
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8000/api/v1';
-  }
-  return typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '/api/v1';
+  return 'http://localhost:8000/api/v1';
 })();
 
 export const SERVER_ORIGIN = (() => {
