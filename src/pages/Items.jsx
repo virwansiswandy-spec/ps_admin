@@ -244,6 +244,8 @@ const Items = () => {
     try {
       const payload = {
         ...formData,
+        sku: formData.sku?.trim() || null,
+        barcode: formData.barcode?.trim() || null,
         ...(user?.id ? { created_by_id: user.id, user_id: user.id } : {}),
         created_by: user?.full_name || user?.username || user?.email || 'Admin',
         category_id: formData.category_id ? parseInt(formData.category_id) : null,
