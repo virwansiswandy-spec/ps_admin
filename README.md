@@ -77,6 +77,35 @@ Aplikasi ini digunakan oleh Owner Toko dan Staff Kasir untuk mengelola inventari
 
 ---
 
+## 🌐 Konfigurasi Web Server / Deployment (PENTING: Mencegah Refresh 404)
+
+Karena React Router berbasis Single Page Application (SPA), saat halaman di-refresh di route seperti `/login`, `/pos`, atau `/dashboard`, web server (Nginx/Apache) harus mengarahkan (*fallback*) semua request ke `index.html`.
+
+### 1. Nginx Config Contoh (`/etc/nginx/sites-available/admin.primasakti.com`):
+```nginx
+server {
+    listen 80;
+    server_name admin.primasakti.com;
+
+    root /var/www/ps/admin/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+### 2. Windows Server IIS:
+File `web.config` sudah otomatis disertakan di folder `public/`, sehingga saat Anda me-run `npm run build`, file `web.config` otomatis ikut ter-copy ke direktori `dist/`.
+
+> ⚠️ **Catatan Penting IIS**: Pastikan modul **URL Rewrite** (`URL Rewrite Module 2.0`) sudah terinstall di IIS Windows Server 2016 Anda. Jika belum terinstall, unduh gratis dari Microsoft IIS Site: [URL Rewrite Download](https://www.iis.net/downloads/microsoft/url-rewrite).
+
+### 3. Apache / cPanel / Netlify:
+File `.htaccess` dan `_redirects` juga sudah otomatis disertakan di folder `public/`.
+
+---
+
 ## 🔑 Login Default Admin
 
 Pastikan backend (`ps\server`) sudah berjalan dan telah di-seed dengan `python seed_admin.py`.
