@@ -47,6 +47,12 @@ const WhatsAppChat = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const wsRef = useRef(null);
+  const activeConversationRef = useRef(activeConversation);
+
+  // Keep activeConversationRef in sync to avoid React stale closure in WebSocket listener
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
 
   // Fetch WA Gateway connection status via FastAPI backend proxy
   const fetchGatewayStatus = async () => {
@@ -93,49 +99,31 @@ const WhatsAppChat = () => {
     }
   };
 
-  // Fetch List of Conversations
   const fetchConversations = async () => {
     try {
-      setLoadingConv(true);
       const params = {};
       if (searchTerm) params.search = searchTerm;
-      const res = await api.get('/wa/conversations', { params });
-      if (res.data && Array.isArray(res.data.results)) {
-        setConversations(res.data.results);
-      } else {
-        setConversations([]);
-      }
+      if (filterUnread) params.unread_only = true;
+
+      const res = await api.get('/wa/conversations/', { params });
+      setConversations(res.data || []);
     } catch (err) {
       console.error('Error fetching WA conversations:', err);
-      setConversations([]);
     } finally {
       setLoadingConv(false);
     }
   };
 
-  // Fetch Messages for Selected Conversation
-  const fetchMessages = async (convId) => {
+  const fetchMessages = async (conversationId) => {
+    if (!conversationId) return;
+    setLoadingMsgs(true);
     try {
-      setLoadingMsgs(true);
-      const res = await api.get(`/wa/conversations/${convId}/messages`);
-      if (res.data && res.data.messages) {
-        setMessages(res.data.messages);
-        setActiveConversation(prev => {
-          if (prev && prev.id === convId) {
-            return {
-              ...prev,
-              is_ai_enabled: res.data.is_ai_enabled,
-              unread_count: 0
-            };
-          }
-          return prev;
-        });
+      const res = await api.get(`/wa/conversations/${conversationId}/messages`);
+      setMessages(res.data || []);
 
-        // Update in conversations list unread count
-        setConversations(prev => prev.map(c => c.id === convId ? { ...c, unread_count: 0 } : c));
-      }
+      setConversations(prev => (Array.isArray(prev) ? prev : []).map(c => c.id === conversationId ? { ...c, unread_count: 0 } : c));
     } catch (err) {
-      console.error('Error fetching messages:', err);
+      console.error('Error fetching WA messages:', err);
     } finally {
       setLoadingMsgs(false);
     }
@@ -147,103 +135,166 @@ const WhatsAppChat = () => {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchConversations();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm, filterUnread]);
+
+  useEffect(() => {
     if (activeConversation?.id) {
       fetchMessages(activeConversation.id);
     }
   }, [activeConversation?.id]);
+
+  // Background polling backup (fetches updates every 8s as safety fallback)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchConversations();
+      if (activeConversationRef.current?.id) {
+        api.get(`/wa/conversations/${activeConversationRef.current.id}/messages`)
+          .then(res => {
+            if (res.data && Array.isArray(res.data)) {
+              setMessages(prev => {
+                const currentList = Array.isArray(prev) ? prev : [];
+                if (res.data.length !== currentList.length) {
+                  return res.data;
+                }
+                return currentList;
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Scroll to bottom of message list
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Setup WebSocket connection for Real-Time Incoming Messages
+  // Setup WebSocket connection with Auto-Reconnect & Stale-Closure Safety
   useEffect(() => {
-    const wsUrl = getWsUrl('/api/v1/wa/ws');
-
     let ws = null;
-    try {
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+    let reconnectTimeout = null;
+    let pingInterval = null;
+    let isDisposed = false;
 
-      ws.onopen = () => {
-        console.log('[WA WS] Connected to WhatsApp WebSocket');
-      };
+    const connectWs = () => {
+      if (isDisposed) return;
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.event === 'new_message') {
-            const { conversation_id, conversation, message } = data;
+      try {
+        const wsUrl = getWsUrl('/api/v1/wa/ws');
+        ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-            setConversations(prev => {
-              const list = Array.isArray(prev) ? prev : [];
-              const existingIdx = list.findIndex(c => c.id === conversation_id);
-              if (existingIdx >= 0) {
-                const updated = [...list];
-                updated[existingIdx] = {
-                  ...updated[existingIdx],
-                  ...conversation,
-                  unread_count: (activeConversation?.id === conversation_id)
-                    ? 0
-                    : (conversation?.unread_count ?? (updated[existingIdx].unread_count + 1))
-                };
-                const [moved] = updated.splice(existingIdx, 1);
-                return [moved, ...updated];
-              } else if (conversation) {
-                return [conversation, ...list];
-              }
-              return list;
-            });
+        ws.onopen = () => {
+          console.log('[WA WS] Connected to WhatsApp WebSocket');
+          // Ping every 25s to keep connection alive through Cloudflare/IIS proxies
+          pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              try { ws.send(JSON.stringify({ type: 'ping' })); } catch (e) {}
+            }
+          }, 25000);
+        };
 
-            if (activeConversation?.id === conversation_id && message) {
-              setMessages(prev => {
-                const msgList = Array.isArray(prev) ? prev : [];
-                if (msgList.some(m => m.id === message.id)) return msgList;
-                return [...msgList, message];
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            const currentActiveId = activeConversationRef.current?.id;
+
+            if (data.event === 'new_message') {
+              const { conversation_id, conversation, message } = data;
+
+              setConversations(prev => {
+                const list = Array.isArray(prev) ? prev : [];
+                const existingIdx = list.findIndex(c => c.id === conversation_id);
+                if (existingIdx >= 0) {
+                  const updated = [...list];
+                  updated[existingIdx] = {
+                    ...updated[existingIdx],
+                    ...conversation,
+                    unread_count: (currentActiveId === conversation_id)
+                      ? 0
+                      : (conversation?.unread_count ?? (updated[existingIdx].unread_count + 1))
+                  };
+                  const [moved] = updated.splice(existingIdx, 1);
+                  return [moved, ...updated];
+                } else if (conversation) {
+                  return [conversation, ...list];
+                }
+                return list;
               });
-            }
-          } else if (data.event === 'ai_toggled') {
-            if (activeConversation?.id === data.conversation_id) {
-              setActiveConversation(prev => ({ ...prev, is_ai_enabled: data.is_ai_enabled }));
-            }
-            setConversations(prev => (Array.isArray(prev) ? prev : []).map(c => c.id === data.conversation_id ? { ...c, is_ai_enabled: data.is_ai_enabled } : c));
-          } else if (data.event === 'conversation_assigned') {
-            if (activeConversation?.id === data.conversation_id) {
-              setActiveConversation(prev => ({ ...prev, assigned_to: data.assigned_to }));
-            }
-            setConversations(prev => (Array.isArray(prev) ? prev : []).map(c => c.id === data.conversation_id ? { ...c, assigned_to: data.assigned_to } : c));
-          } else if (data.event === 'sync_progress') {
-            setSyncState({
-              syncing: data.status === 'in_progress',
-              progress: data.progress || 0,
-              message: data.message || ''
-            });
 
-            if (data.status === 'completed') {
-              fetchConversations();
-              setTimeout(() => {
-                setSyncState({ syncing: false, progress: 0, message: '' });
-              }, 4000);
+              if (currentActiveId === conversation_id && message) {
+                setMessages(prev => {
+                  const msgList = Array.isArray(prev) ? prev : [];
+                  if (msgList.some(m => m.id === message.id)) return msgList;
+                  return [...msgList, message];
+                });
+              }
+            } else if (data.event === 'ai_toggled') {
+              if (currentActiveId === data.conversation_id) {
+                setActiveConversation(prev => ({ ...prev, is_ai_enabled: data.is_ai_enabled }));
+              }
+              setConversations(prev => (Array.isArray(prev) ? prev : []).map(c => c.id === data.conversation_id ? { ...c, is_ai_enabled: data.is_ai_enabled } : c));
+            } else if (data.event === 'conversation_assigned') {
+              if (currentActiveId === data.conversation_id) {
+                setActiveConversation(prev => ({ ...prev, assigned_to: data.assigned_to }));
+              }
+              setConversations(prev => (Array.isArray(prev) ? prev : []).map(c => c.id === data.conversation_id ? { ...c, assigned_to: data.assigned_to } : c));
+            } else if (data.event === 'sync_progress') {
+              setSyncState({
+                syncing: data.status === 'in_progress',
+                progress: data.progress || 0,
+                message: data.message || ''
+              });
+
+              if (data.status === 'completed') {
+                fetchConversations();
+                setTimeout(() => {
+                  setSyncState({ syncing: false, progress: 0, message: '' });
+                }, 4000);
+              }
             }
+          } catch (e) {
+            console.error('[WA WS] Parse error:', e);
           }
-        } catch (e) {
-          console.error('[WA WS] Parse error:', e);
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        console.log('[WA WS] WebSocket disconnected');
-      };
-    } catch (err) {
-      console.error('[WA WS] Connection error:', err);
-    }
+        ws.onclose = () => {
+          if (pingInterval) clearInterval(pingInterval);
+          if (!isDisposed) {
+            console.log('[WA WS] WebSocket connection closed, reconnecting in 3s...');
+            reconnectTimeout = setTimeout(connectWs, 3000);
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.warn('[WA WS] Connection error encountered');
+        };
+      } catch (err) {
+        console.error('[WA WS] Setup error:', err);
+        if (!isDisposed) {
+          reconnectTimeout = setTimeout(connectWs, 5000);
+        }
+      }
+    };
+
+    connectWs();
 
     return () => {
-      if (ws) ws.close();
+      isDisposed = true;
+      if (pingInterval) clearInterval(pingInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
     };
-  }, [activeConversation?.id]);
+  }, []);
 
   // Handle Send Reply (Text or Media)
   const handleSendReply = async (e) => {
