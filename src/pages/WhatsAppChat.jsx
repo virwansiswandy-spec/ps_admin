@@ -48,12 +48,11 @@ const WhatsAppChat = () => {
   const fileInputRef = useRef(null);
   const wsRef = useRef(null);
 
-  // Fetch WA Gateway connection status from node service
+  // Fetch WA Gateway connection status via FastAPI backend proxy
   const fetchGatewayStatus = async () => {
     try {
       setGatewayStatus(prev => ({ ...prev, loading: true }));
-      const gatewayUrl = import.meta.env.VITE_WA_GATEWAY_URL || (import.meta.env.DEV ? 'http://localhost:3001' : (typeof window !== 'undefined' ? window.location.origin : ''));
-      const res = await fetch(`${gatewayUrl}/status`).then(r => r.json());
+      const res = await api.get('/wa/gateway-status').then(r => r.data);
       if (res && (res.client_status === 'ready' || res.client_status === 'authenticated')) {
         setGatewayStatus({
           loading: false,
@@ -68,7 +67,7 @@ const WhatsAppChat = () => {
           connected: false,
           pushname: '',
           wid: '',
-          statusText: res.client_status || 'Tidak terhubung'
+          statusText: res.message || res.client_status || 'Tidak terhubung'
         });
       }
     } catch (err) {
@@ -77,7 +76,7 @@ const WhatsAppChat = () => {
         connected: false,
         pushname: '',
         wid: '',
-        statusText: 'Gateway Service Offline (Port 3001)'
+        statusText: 'Gagal menghubungkan ke WhatsApp Gateway'
       });
     }
   };
