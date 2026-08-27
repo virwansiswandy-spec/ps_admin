@@ -1,22 +1,31 @@
 import axios from 'axios';
 
-const rawEnvUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').trim();
+const envApiUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.trim() : '';
 
 export const API_BASE_URL = (() => {
-  if (/^https?:\/\//i.test(rawEnvUrl)) {
-    return rawEnvUrl;
+  if (envApiUrl) {
+    if (/^https?:\/\//i.test(envApiUrl)) {
+      return envApiUrl;
+    }
+    if (envApiUrl.startsWith('/')) {
+      return typeof window !== 'undefined' ? `${window.location.origin}${envApiUrl}` : envApiUrl;
+    }
+    if (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1')) {
+      return `http://${envApiUrl}`;
+    }
+    return `https://${envApiUrl}`;
   }
-  if (rawEnvUrl.includes('localhost') || rawEnvUrl.includes('127.0.0.1')) {
-    return `http://${rawEnvUrl}`;
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8000/api/v1';
   }
-  return `https://${rawEnvUrl}`;
+  return typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '/api/v1';
 })();
 
 export const SERVER_ORIGIN = (() => {
   try {
     return new URL(API_BASE_URL).origin;
   } catch (e) {
-    return API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+    return typeof window !== 'undefined' ? window.location.origin : '';
   }
 })();
 
@@ -36,8 +45,10 @@ export const getWsUrl = (path = '/api/v1/wa/ws') => {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     return `${wsProtocol}//${urlObj.host}${cleanPath}`;
   } catch (e) {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${wsProtocol}//localhost:8000/api/v1/wa/ws`;
+    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = typeof window !== 'undefined' ? window.location.host : 'localhost:8000';
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${wsProtocol}//${host}${cleanPath}`;
   }
 };
 

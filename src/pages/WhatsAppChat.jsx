@@ -52,7 +52,7 @@ const WhatsAppChat = () => {
   const fetchGatewayStatus = async () => {
     try {
       setGatewayStatus(prev => ({ ...prev, loading: true }));
-      const gatewayUrl = import.meta.env.VITE_WA_GATEWAY_URL || 'http://localhost:3001';
+      const gatewayUrl = import.meta.env.VITE_WA_GATEWAY_URL || (import.meta.env.DEV ? 'http://localhost:3001' : (typeof window !== 'undefined' ? window.location.origin : ''));
       const res = await fetch(`${gatewayUrl}/status`).then(r => r.json());
       if (res && (res.client_status === 'ready' || res.client_status === 'authenticated')) {
         setGatewayStatus({
